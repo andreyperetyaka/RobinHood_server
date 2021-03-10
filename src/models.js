@@ -22,8 +22,8 @@ exports.User = model(
   })
 );
 
-exports.Number = model(
-  'Number',
+exports.Vote = model(
+  'Vote',
   new Schema({
     number: {
       type: Number,
@@ -32,7 +32,7 @@ exports.Number = model(
     basis: {
       type: Number,
     },
-    votes: {
+    users: {
       type: Map,
       of: String,
       default: new Map(),

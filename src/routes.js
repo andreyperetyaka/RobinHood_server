@@ -1,10 +1,11 @@
 const { Router } = require('express');
-const { check, vote, referrer } = require('./controllers.js');
+const { login, getVotes, postVote, referrer } = require('./controllers.js');
 
 const router = Router();
 
-router.post('/check', check);
-router.post('/vote', vote);
-router.post('/referrer', referrer);
+router.get('/login', login);
+router.put('/referrer', referrer);
+router.get('/votes', getVotes);
+router.post('/votes', postVote);
 
 module.exports = router;

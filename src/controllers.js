@@ -1,13 +1,12 @@
-const { User, Number } = require('./models.js');
-const { errorHandler } = require('./utils');
+const { User, Vote } = require('./models.js');
 
 const convertDocumentToVote = (document, id) => {
   let number = document.number;
   let basis = document.basis || 0;
-  let votes = [...document.votes.values()];
-  let good = votes.filter((vote) => vote === 'good').length;
-  let bad = votes.filter((vote) => vote === 'bad').length + basis;
-  let voted = document.votes.get(id);
+  let users = [...document.users.values()];
+  let good = users.filter((user) => user === 'good').length;
+  let bad = users.filter((user) => user === 'bad').length + basis;
+  let voted = document.users.get(id);
   return { number, good, bad, voted };
 };
 
@@ -19,46 +18,54 @@ const addMonth = (model) => {
   return model.save();
 };
 
-exports.check = async (request, response) => {
+exports.login = async (request, response) => {
+  let price = process.env.PRICE;
+  let user = { ...request.user.toJSON(), price };
+  response.status(200).json(user);
+};
+
+exports.getVotes = async (request, response) => {
   try {
-    if (request.body.length > 10)
-      throw new Error('Please less than 10 numbers per request!');
-    let user = { ...request.user.toJSON(), price: process.env.PRICE };
+    let params = request.query.numbers;
+    if (!params) throw { message: 'No query' };
+    let numbers = params.split(',');
+    if (numbers.length > 10) throw { message: 'Please less then 10 numbers' };
+    let user = request.user;
     if (user.dueDate > Date.now()) {
-      let data = await Number.find({ number: request.body });
-      let numbers = data.map((document) =>
+      let documents = await Vote.find({ number: numbers });
+      let votes = documents.map((document) =>
         convertDocumentToVote(document, user._id)
       );
-      response.status(200).json({ user, numbers });
+      response.status(200).json(votes);
     } else {
-      response.status(200).json({ user });
+      response.status(403).json({ message: 'Access Denied' });
     }
   } catch (error) {
-    errorHandler(error, response);
+    response.status(400).json(error);
   }
 };
 
-exports.vote = async (request, response) => {
+exports.postVote = async (request, response) => {
   try {
     let id = request.user._id;
-    let number = request.body.number;
-    let vote = request.body.vote;
-    let document = await Number.findOne({ number });
+    let { number, vote } = request.body;
+    let document = await Vote.findOne({ number });
     if (!document) {
-      document = new Number({ number });
+      document = new Vote({ number });
     }
-    document.votes.set(id, vote);
+    document.users.set(id, vote);
     await document.save();
     response.status(200).json(convertDocumentToVote(document, id));
   } catch (error) {
-    errorHandler(error, response);
+    response.status(400).json(error);
   }
 };
 
 exports.referrer = async (request, response) => {
   try {
     let user = request.user;
-    if (user.referrer !== 'none') throw new Error('You already used a code!');
+    if (user.referrer !== 'none')
+      throw { message: 'You already have a referrer' };
     user.referrer = request.body.referrer;
     await user.save();
     let referrer =
@@ -69,10 +76,9 @@ exports.referrer = async (request, response) => {
       await addMonth(referrer);
       await addMonth(user);
     }
-    let answer = !!referrer;
-    user = { ...user.toJSON(), price: process.env.PRICE };
-    response.status(200).json({ answer, user });
+    referrer = !!referrer;
+    response.status(200).json({ referrer });
   } catch (error) {
-    errorHandler(error, response);
+    response.status(400).json(error);
   }
 };

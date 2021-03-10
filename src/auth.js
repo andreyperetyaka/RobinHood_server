@@ -2,11 +2,11 @@ const https = require('https');
 
 const { User } = require('./models.js');
 
-const validateToken = (token) =>
+const validate = (token) =>
   new Promise((resolve, reject) => {
     https
       .get(
-        `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${token}`,
+        `https://oauth2.googleapis.com/tokeninfo?access_token=${token}`,
         (response) => {
           let data = '';
           response.on('data', (chunk) => {
@@ -23,28 +23,24 @@ const validateToken = (token) =>
   });
 
 module.exports = async (request, response, next) => {
-  if (request.headers.authorization) {
+  try {
+    let authorization = request.headers.authorization;
+    if (!authorization) throw { message: 'No authorization header' };
     let token = request.headers.authorization.split(' ')[1];
-    let tokenData = await validateToken(token);
-    let id = tokenData.sub;
-    if (id) {
-      let user = await User.findById(id);
-      if (!user) {
-        const now = new Date();
-        let bonusDate = now.setMonth(now.getMonth() + 1);
-        user = new User({
-          _id: id,
-          email: tokenData.email,
-          dueDate: bonusDate,
-        });
-        await user.save();
-      }
-      request.user = user;
-      next();
-    } else {
-      response.status(419).json({ message: 'Invalid Access Token' });
+    let data = await validate(token);
+    let _id = data.sub;
+    if (!_id) throw { message: 'No user' };
+    let user = await User.findById(_id);
+    if (!user) {
+      let email = data.email;
+      const now = new Date();
+      let dueDate = now.setMonth(now.getMonth() + 1);
+      user = new User({ _id, email, dueDate });
+      await user.save();
     }
-  } else {
-    response.status(401).json({ message: 'Authentication failed!' });
+    request.user = user;
+    next();
+  } catch (error) {
+    response.status(401).json(error);
   }
 };
