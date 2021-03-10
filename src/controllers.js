@@ -76,8 +76,8 @@ exports.referrer = async (request, response) => {
       await addMonth(referrer);
       await addMonth(user);
     }
-    referrer = !!referrer;
-    response.status(200).json({ referrer });
+    let answer = !!referrer;
+    response.status(200).json({ user, answer });
   } catch (error) {
     response.status(400).json(error);
   }
